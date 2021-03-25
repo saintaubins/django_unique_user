@@ -1,0 +1,217 @@
+pip install pipenv
+
+pipenv shell
+
+pipenv install django djangorestframework 
+
+django-admin startproject emt
+
+cd emt
+
+python manage.py startapp transformers
+
+*******************************************************************
+
+pip install psycopg2
+
+DATABASES = {
+   'default': {
+       'ENGINE': 'django.db.backends.postgresql',
+       'NAME': 'emt',
+       'USER': 'Saint-Aubin',
+       'PASSWORD': '123',
+       'HOST': '127.0.0.1',
+       'PORT': '5432',
+   }
+}
+
+pip install httpie
+
+*********************************************************************
+add to installed apps 
+
+'transformers',
+'rest_framework',
+
+*********************************************************************
+
+models.py
+
+class Transformer(models.Model):
+    name = models.CharField(max_length=150, unique=True)
+    alternate_mode = models.CharField(
+        max_length=250,
+        blank=True,
+        null=True)
+    description = models.CharField(
+        max_length=500,
+        blank=True,
+        null=True)
+    alive = models.BooleanField(default=False)
+  
+    class Meta:
+        ordering = ('name',)
+  
+    def __str__(self):
+        return self.name
+
+python manage.py makemigrations
+
+python manage.py migrate
+
+*********************************************************************
+
+create serializer.py in transformers directory
+
+from rest_framework import serializers
+from transformers.models import Transformer
+  
+class TransformerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Transformer
+        fields = "__all__"
+
+*******************************************************************
+
+add code to views.py
+
+from django.http import HttpResponse, JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from rest_framework.parsers import JSONParser
+
+from transformers.models import Transformer
+from transformers.serializers import TransformerSerializer
+
+@csrf_exempt
+def transformer_list(request):
+	"""
+	List all transformers, or create a new transformer
+	"""
+	if request.method == 'GET':
+		transformer = Transformer.objects.all()
+		serializer = TransformerSerializer(transformer, many=True)
+		return JsonResponse(serializer.data, safe=False)
+
+	elif request.method == 'POST':
+		data = JSONParser().parse(request)
+		serializer = TransformerSerializer(data=data)
+		if serializer.is_valid():
+			serializer.save()
+			return JsonResponse(serializer.data, status=201)
+		return JsonResponse(serializer.errors, status=400)
+
+@csrf_exempt
+def transformer_detail(request, pk):
+	try:
+		transformer = Transformer.objects.get(pk=pk)
+	except Transformer.DoesNotExist:
+		return HttpResponse(status=404)
+
+	if request.method == 'GET':
+		serializer = TransformerSerializer(transformer)
+		return JsonResponse(serializer.data)
+
+	elif request.method == 'PUT':
+		data = JSONParser().parse(request)
+		serializer = TransformerSerializer(transformer, data=data)
+
+		if serializer.is_valid():
+			serializer.save()
+			return JsonResponse(serializer.data)
+		return JsonResponse(serializer.errors, status=400)
+
+	elif request.method == 'DELETE':
+		transformer.delete()
+		return HttpResponse(status=204)
+
+**********************************************************************
+
+make urls.py in the transformer app 
+
+from django.urls import path
+from transformers import views
+
+urlpatterns = [
+	path('transformers/',
+		views.transformer_list,
+		name = 'employee-list'),
+	path('transformers/<int:pk>/',
+		views.transformer_detail,
+		name = 'employee-detail'),
+]
+
+********************************************************************
+
+go to main urls.py and insert
+
+from django.contrib import admin
+from django.urls import path, include
+
+urlpatterns = [
+	path('', include('transformers.urls')),
+]
+
+**********************************************************************
+
+replace views.py file with decorators updated code
+
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+
+from transformers.models import Transformer
+from transformers.serializers import TransformerSerializer
+
+@api_view(['GET','POST'])
+def transformer_list(request):
+	"""
+	List all transformers, or create a new transformer
+	"""
+	if request.method == 'GET':
+		transformer = Transformer.objects.all()
+		serializer = TransformerSerializer(transformer, many=True)
+		return Response(serializer.data)
+
+	elif request.method == 'POST':
+		serializer = TransformerSerializer(data=request.data)
+		if serializer.is_valid():
+			serializer.save()
+			return Response(serializer.data,
+							status=status.HTTP_201_CREATED)
+		return Response(serializer.errors,
+						status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET','PUT','PATCH','DELETE'])
+def transformer_detail(request, pk):
+	try:
+		transformer = Transformer.objects.get(pk=pk)
+	except Transformer.DoesNotExist:
+		return Response(status=status.HTTP_404_NOT_FOUND)
+
+	if request.method == 'GET':
+		serializer = TransformerSerializer(transformer)
+		return Response(serializer.data)
+
+	elif request.method == 'PUT':
+		serializer = TransformerSerializer(transformer, data=request.data)
+
+		if serializer.is_valid():
+			serializer.save()
+			return Response(serializer.data)
+		return Response(serializer.errors,
+						status=status.HTTP_400_BAD_REQUEST)
+	elif request.method == 'PATCH':
+		serializer = TransformerSerializer(transformer,
+										data=request.data,
+										partial=True)
+
+		if serializer.is_valid():
+			serializer.save()
+			return Response(serializer.data)
+		return Response(serializer.errors,
+						status=status.HTTP_400_BAD_REQUEST)
+
+	elif request.method == 'DELETE':
+		transformer.delete()
+		return Response(status=status.HTTP_204_NO_CONTENT)
+
