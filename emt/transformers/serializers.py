@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from transformers.models import Transformer
+from transformers.models import Transformer, Customer
 from django.contrib.auth.models import User
   
 class TransformerSerializer(serializers.ModelSerializer):
@@ -7,6 +7,7 @@ class TransformerSerializer(serializers.ModelSerializer):
         model = Transformer
         fields = "__all__"
 
-class UserSerializer(serializers.HyperlinkedModelSerializer):
+class CustomerSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
-        model = User
+        model = Customer
+        fields = "__all__"
